@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "645842287953",
+    "project_id": "citytripapp-12970",
+    "storage_bucket": "citytripapp-12970.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:645842287953:android:e3db16ad25a54bee26a770",
+        "android_client_info": {
+          "package_name": "com.example.citytripv2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuU37yPPrjHedjP9g490kg3P5dDRqZHuk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
