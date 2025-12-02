@@ -2,8 +2,6 @@ package com.example.citytripv2.ui.screens
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,13 +26,6 @@ fun HomeScreen() {
             TopAppBar(
                 title = { Text("CityTrip Kaart") },
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { /* TODO: Navigate to AddCityScreen */ }
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Stad toevoegen")
-            }
         }
     ) { padding ->
         HomeMapView(

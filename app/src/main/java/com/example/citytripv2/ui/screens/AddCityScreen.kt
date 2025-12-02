@@ -30,7 +30,6 @@ fun AddCityScreen(
     var cityName by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var imageUrl by remember { mutableStateOf("") }
     var selectedLatitude by remember { mutableStateOf(52.3676) }
     var selectedLongitude by remember { mutableStateOf(4.9041) }
     var showSuccessDialog by remember { mutableStateOf(false) }
@@ -87,95 +86,6 @@ fun AddCityScreen(
                 maxLines = 5
             )
 
-            OutlinedTextField(
-                value = imageUrl,
-                onValueChange = { imageUrl = it },
-                label = { Text("Afbeelding URL") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Locatie op kaart *",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Icon(
-                            imageVector = Icons.Default.MyLocation,
-                            contentDescription = "Locatie",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "Lat: ${String.format("%.4f", selectedLatitude)}, Lon: ${String.format("%.4f", selectedLongitude)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    MapViewComposable(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
-                        context = context,
-                        initialLatitude = selectedLatitude,
-                        initialLongitude = selectedLongitude,
-                        onLocationSelected = { lat, lon ->
-                            selectedLatitude = lat
-                            selectedLongitude = lon
-                        }
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "Tip: Klik op de kaart om de locatie van de stad te selecteren",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "ℹ️ Locaties toevoegen",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Na het aanmaken van de stad kun je specifieke locaties (bezienswaardigheden, restaurants, etc.) toevoegen en koppelen.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
@@ -186,7 +96,6 @@ fun AddCityScreen(
                             name = cityName,
                             country = country,
                             description = description.ifBlank { null },
-                            imageUrl = imageUrl.ifBlank { null },
                             latitude = selectedLatitude,
                             longitude = selectedLongitude,
                             locations = emptyList()
@@ -312,7 +221,6 @@ data class City(
     val name: String,
     val country: String,
     val description: String? = null,
-    val imageUrl: String? = null,
     val latitude: Double,
     val longitude: Double,
     val locations: List<Location> = emptyList()
