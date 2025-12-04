@@ -23,6 +23,7 @@ import com.example.citytripv2.ui.theme.CityTripV2Theme
 import com.example.citytripv2.viewmodel.HomeViewModel // <--- BELANGRIJK: Import je ViewModel
 import com.google.firebase.auth.FirebaseAuth
 
+// push
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
