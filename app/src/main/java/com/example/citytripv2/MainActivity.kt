@@ -11,6 +11,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel // <--- BELANGRIJK: Import voor ViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -19,6 +20,7 @@ import com.example.citytripv2.ui.auth.LoginScreen
 import com.example.citytripv2.ui.auth.RegisterScreen
 import com.example.citytripv2.ui.screens.AddCityScreen
 import com.example.citytripv2.ui.theme.CityTripV2Theme
+import com.example.citytripv2.viewmodel.HomeViewModel // <--- BELANGRIJK: Import je ViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
@@ -46,7 +48,7 @@ class MainActivity : ComponentActivity() {
 fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
-    val context = LocalContext.current // Nodig voor de Toast later
+    val context = LocalContext.current
 
     NavHost(
         navController = navController,
@@ -81,7 +83,7 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
             )
         }
 
-        // --- ROUTE 3: Hoofd App (Tabs) ---
+        // --- ROUTE 3: Hoofd App ---
         composable("main") {
             MainScreen(
                 onLogout = {
@@ -90,23 +92,29 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                // NIEUW: De koppeling voor de + knop op HomeScreen
                 onNavigateToAddCity = {
                     navController.navigate("add_city")
                 }
             )
         }
 
-        // --- ROUTE 4: Stad Toevoegen (NIEUW) ---
+        // --- ROUTE 4: Stad Toevoegen (MET FIREBASE OPSLAG) ---
         composable("add_city") {
+            // 1. Haal de HomeViewModel op. Deze regelt de communicatie met Firebase.
+            val homeViewModel: HomeViewModel = viewModel()
+
             AddCityScreen(
                 onNavigateBack = {
-                    navController.popBackStack() // Ga terug naar de lijst
+                    navController.popBackStack()
                 },
-                onCityAdded = { city ->
-                    // TODO: Hier komt later de Firestore opslag code
-                    Toast.makeText(context, "Stad ${city.name} opgeslagen (lokaal)", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack() // Ga terug na opslaan
+                onCityAdded = { newLocation ->
+                    // 2. Stuur de nieuwe locatie naar Firebase via de ViewModel
+                    homeViewModel.addLocation(newLocation)
+
+                    Toast.makeText(context, "Opgeslagen! Check je Home scherm.", Toast.LENGTH_SHORT).show()
+
+                    // 3. Ga terug naar het overzicht (de lijst update automatisch)
+                    navController.popBackStack()
                 }
             )
         }
