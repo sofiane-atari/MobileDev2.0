@@ -2,7 +2,6 @@ package com.example.citytripv2.ui.screens
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -17,23 +16,26 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.citytripv2.ui.screens.ChatScreen
 import com.example.citytripv2.ui.screens.ProfileScreen
-
 
 sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
     object Home : BottomNavItem("tab_home", "Home", Icons.Default.Home)
-    object AddCity : BottomNavItem("tab_add_city", "Stad", Icons.Default.Add)
+    // AddCity is hier verwijderd, want het is geen tabblad meer
     object Chats : BottomNavItem("tab_chats", "Chats", Icons.Default.Chat)
     object Profile : BottomNavItem("tab_profile", "Profiel", Icons.Default.Person)
 }
 
 @Composable
-fun MainScreen(onLogout: () -> Unit) {
+fun MainScreen(
+    onLogout: () -> Unit,
+    onNavigateToAddCity: () -> Unit // <--- NIEUW: We moeten dit doorgeven aan HomeScreen
+) {
     val navController = rememberNavController()
 
+    // AddCity ook hier uit de lijst gehaald
     val items = listOf(
         BottomNavItem.Home,
-        BottomNavItem.AddCity,
         BottomNavItem.Chats,
         BottomNavItem.Profile
     )
@@ -51,7 +53,6 @@ fun MainScreen(onLogout: () -> Unit) {
                         selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                         onClick = {
                             navController.navigate(screen.route) {
-                                // Pop up to start destination om back-stack niet te vervuilen
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
                                 }
@@ -64,21 +65,19 @@ fun MainScreen(onLogout: () -> Unit) {
             }
         }
     ) { innerPadding ->
-        // De geneste navigatie voor de tabs
         NavHost(
             navController = navController,
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(BottomNavItem.Home.route) { HomeScreen() }
-            composable(BottomNavItem.AddCity.route) { 
-                AddCityScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onCityAdded = { city ->
-                        // TODO: Save city to database
-                    }
-                )
+            // Geef de callback door aan HomeScreen zodat de + knop werkt
+            composable(BottomNavItem.Home.route) {
+                HomeScreen(onNavigateToAddCity = onNavigateToAddCity)
             }
+
+            // De AddCity composable is hier verwijderd.
+            // Die zit nu in MainActivity.kt als aparte route "add_city".
+
             composable(BottomNavItem.Chats.route) { ChatScreen() }
             composable(BottomNavItem.Profile.route) { ProfileScreen(onLogout = onLogout) }
         }

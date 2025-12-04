@@ -1,3 +1,21 @@
 package com.example.citytripv2.model
 
-data class CityTripLocation()
+import com.google.firebase.firestore.PropertyName
+
+
+data class CityTripLocation(
+    val id: String = "",
+    val name: String = "",
+    val city: String = "",
+    val country: String = "",
+    val description: String? = null,
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val category: String = "Overige", // "Stad", "Hotel", "Horeca", "Bezienswaardigheid"
+    val imageUrl: String? = null,
+    val rating: Float = 0f,
+    val userId: String = ""       // Wie heeft dit aangemaakt?
+) {
+    // Lege constructor is verplicht voor Firebase Firestore om data te kunnen inlezen
+    constructor() : this("", "", "", "", null, 0.0, 0.0, "Overige", null, 0f, "")
+}
