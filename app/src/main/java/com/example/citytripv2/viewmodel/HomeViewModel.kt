@@ -54,6 +54,48 @@ class HomeViewModel : ViewModel() {
             }
     }
 
+    // NIEUW: Haal 1 specifieke locatie op (voor het detailscherm)
+    fun getLocationById(id: String, onResult: (CityTripLocation?) -> Unit) {
+        // We zoeken eerst in de lokale lijst (sneller)
+        val local = _locations.value.find { it.id == id }
+        if (local != null) {
+            onResult(local)
+            return
+        }
+        // Anders halen we hem op uit DB
+        db.collection("locations").document(id).get()
+            .addOnSuccessListener { doc ->
+                onResult(doc.toObject(CityTripLocation::class.java))
+            }
+            .addOnFailureListener {
+                onResult(null)
+            }
+    }
+
+    // NIEUW: Review toevoegen
+    fun addReview(locationId: String, rating: Int, comment: String, onSuccess: () -> Unit) {
+        val user = auth.currentUser ?: return
+
+        val reviewData = hashMapOf(
+            "userId" to user.uid,
+            "userEmail" to user.email,
+            "rating" to rating,
+            "comment" to comment,
+            "timestamp" to System.currentTimeMillis()
+        )
+
+        // 1. Voeg review toe aan subcollectie
+        db.collection("locations").document(locationId)
+            .collection("reviews")
+            .add(reviewData)
+            .addOnSuccessListener {
+                // 2. Update de gemiddelde rating van de hoofdlocatie (Simpele update: overschrijf met nieuwe)
+                db.collection("locations").document(locationId)
+                    .update("rating", rating.toFloat())
+                    .addOnSuccessListener { onSuccess() }
+            }
+    }
+
     fun addLocation(location: CityTripLocation, imageUri: Uri?, context: Context, onSuccess: () -> Unit) {
         val userId = auth.currentUser?.uid ?: return
 
