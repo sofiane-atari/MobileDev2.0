@@ -15,7 +15,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-
 import com.example.citytripv2.ui.auth.LoginScreen
 import com.example.citytripv2.ui.auth.RegisterScreen
 import com.example.citytripv2.ui.screens.AddCityScreen
@@ -24,6 +23,7 @@ import com.example.citytripv2.ui.screens.MyLocationsScreen
 import com.example.citytripv2.ui.screens.RegisterCityScreen
 import com.example.citytripv2.ui.theme.CityTripV2Theme
 import com.example.citytripv2.viewmodel.HomeViewModel
+import com.example.citytripv2.ui.screens.LocationDetailScreen
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
@@ -100,6 +100,9 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
                 },
                 onNavigateToMyLocations = {
                     navController.navigate("my_locations")
+                },
+                onNavigateToDetail = { locationId ->
+                    navController.navigate("detail/$locationId")
                 }
             )
         }
@@ -115,10 +118,15 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
                 onNavigateToRegisterCity = {
                     navController.navigate("register_city")
                 },
-                onCityAdded = { newLocation ->
-                    homeViewModel.addLocation(newLocation)
-                    Toast.makeText(context, "Opgeslagen!", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
+                // UPDATE: De callback heeft nu (location, imageUri)
+                onCityAdded = { newLocation, imageUri ->
+
+                    // We geven 'context' mee aan de ViewModel functie!
+                    homeViewModel.addLocation(newLocation, imageUri, context) {
+                        // Dit blok wordt pas uitgevoerd als alles klaar is
+                        Toast.makeText(context, "Opgeslagen!", Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
                 }
             )
         }
@@ -144,6 +152,18 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
                 },
                 viewModel = homeViewModel
             )
+        }
+        // --- ROUTE 7: Detail Scherm (NIEUW) ---
+        composable("detail/{locationId}") { backStackEntry ->
+            // Haal het ID uit de navigatie link
+            val locationId = backStackEntry.arguments?.getString("locationId")
+
+            if (locationId != null) {
+                LocationDetailScreen(
+                    locationId = locationId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

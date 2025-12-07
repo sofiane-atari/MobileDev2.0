@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -29,19 +30,21 @@ fun RegisterCityScreen(
     var country by remember { mutableStateOf("") }
     val userId = FirebaseAuth.getInstance().currentUser?.uid
 
-    // Kleuren (Consistent met HomeScreen)
+    // FIX 1: Context ophalen (nodig voor de nieuwe addLocation functie)
+    val context = LocalContext.current
+
+    // Kleuren
     val headerBlue = Color(0xFF0089D0)
     val headerGreen = Color(0xFF00A88F)
     val bgGradient = Brush.horizontalGradient(listOf(headerBlue, headerGreen))
 
     Scaffold(
         topBar = {
-            // Custom Gradient Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(bgGradient)
-                    .statusBarsPadding() // Zorgt dat het niet onder de statusbalk verdwijnt
+                    .statusBarsPadding()
                     .padding(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -67,11 +70,10 @@ fun RegisterCityScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F5F5)) // Lichte achtergrond
+                .background(Color(0xFFF5F5F5))
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Informatie Kaart
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -99,7 +101,6 @@ fun RegisterCityScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Invulvelden (Met witte achtergrond)
             OutlinedTextField(
                 value = cityName,
                 onValueChange = { cityName = it },
@@ -130,7 +131,6 @@ fun RegisterCityScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Grote Actie Knop
             Button(
                 onClick = {
                     if (cityName.isNotBlank() && country.isNotBlank() && userId != null) {
@@ -145,8 +145,10 @@ fun RegisterCityScreen(
                             longitude = 0.0,
                             userId = userId
                         )
-                        viewModel.addLocation(newCity)
-                        onNavigateBack()
+
+                        viewModel.addLocation(newCity, null, context) {
+                            onNavigateBack()
+                        }
                     }
                 },
                 modifier = Modifier
