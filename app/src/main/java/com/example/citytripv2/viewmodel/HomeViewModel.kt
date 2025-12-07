@@ -21,7 +21,6 @@ class HomeViewModel : ViewModel() {
     val locations: StateFlow<List<CityTripLocation>> = _locations.asStateFlow()
 
     init {
-        // Start met luisteren zodra de ViewModel wordt gemaakt
         fetchLocations()
     }
 
@@ -62,6 +61,19 @@ class HomeViewModel : ViewModel() {
             }
             .addOnFailureListener { e ->
                 Log.w("HomeViewModel", "Fout bij opslaan", e)
+            }
+    }
+
+    fun deleteLocation(locationId: String, onSuccess: () -> Unit) {
+        db.collection("locations")
+            .document(locationId)
+            .delete()
+            .addOnSuccessListener {
+                Log.d("HomeViewModel", "Locatie verwijderd!")
+                onSuccess()
+            }
+            .addOnFailureListener { e ->
+                Log.e("HomeViewModel", "Fout bij verwijderen", e)
             }
     }
 }
