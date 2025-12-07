@@ -27,8 +27,12 @@ fun MyLocationsScreen(
     val allLocations by viewModel.locations.collectAsState()
     val currentUser = FirebaseAuth.getInstance().currentUser
 
-    // Filter: Toon alleen locaties van de huidige user
-    val myLocations = allLocations.filter { it.userId == currentUser?.uid }
+    // AANGEPAST FILTER:
+    // 1. Alleen van de huidige user
+    // 2. EN de categorie mag NIET "Stad" zijn
+    val myLocations = allLocations.filter {
+        it.userId == currentUser?.uid && it.category != "Stad"
+    }
 
     Scaffold(
         topBar = {
@@ -50,7 +54,7 @@ fun MyLocationsScreen(
         ) {
             if (myLocations.isEmpty()) {
                 Text(
-                    text = "Je hebt nog geen locaties toegevoegd.",
+                    text = "Je hebt nog geen locaties (spots) toegevoegd.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.Gray,
                     modifier = Modifier.align(Alignment.Center)
@@ -83,7 +87,6 @@ fun MyLocationCard(
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // Hergebruik je bestaande LocationCard layout, maar voeg een delete knop toe
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -102,7 +105,7 @@ fun MyLocationCard(
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = location.city,
+                    text = "${location.category} in ${location.city}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
@@ -134,7 +137,7 @@ fun MyLocationCard(
                 ) { Text("Verwijder") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Annuleer") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Annuleren") }
             }
         )
     }

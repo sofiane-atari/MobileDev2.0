@@ -15,11 +15,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.citytripv2.ui.screens.MainScreen
+
 import com.example.citytripv2.ui.auth.LoginScreen
 import com.example.citytripv2.ui.auth.RegisterScreen
 import com.example.citytripv2.ui.screens.AddCityScreen
+import com.example.citytripv2.ui.screens.MainScreen
 import com.example.citytripv2.ui.screens.MyLocationsScreen
+import com.example.citytripv2.ui.screens.RegisterCityScreen
 import com.example.citytripv2.ui.theme.CityTripV2Theme
 import com.example.citytripv2.viewmodel.HomeViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -84,7 +86,7 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
             )
         }
 
-        // --- ROUTE 3: Hoofd App (Tabs) ---
+        // --- ROUTE 3: Hoofd App ---
         composable("main") {
             MainScreen(
                 onLogout = {
@@ -102,13 +104,16 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
             )
         }
 
-        // --- ROUTE 4: Stad Toevoegen ---
+        // --- ROUTE 4: Stad Toevoegen (Locatie/Spot) ---
         composable("add_city") {
             val homeViewModel: HomeViewModel = viewModel()
 
             AddCityScreen(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToRegisterCity = {
+                    navController.navigate("register_city")
                 },
                 onCityAdded = { newLocation ->
                     homeViewModel.addLocation(newLocation)
@@ -118,7 +123,18 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
             )
         }
 
-        // --- ROUTE 5: Mijn Locaties (NIEUW) ---
+        // --- ROUTE 5: Nieuwe Stad Registreren ---
+        composable("register_city") {
+            val homeViewModel: HomeViewModel = viewModel()
+            RegisterCityScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                viewModel = homeViewModel
+            )
+        }
+
+        // --- ROUTE 6: Mijn Locaties ---
         composable("my_locations") {
             val homeViewModel: HomeViewModel = viewModel()
 
