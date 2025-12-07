@@ -17,11 +17,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.citytripv2.ui.screens.ChatScreen
-import com.example.citytripv2.ui.screens.ProfileScreen
 
-sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
+// Private gemaakt om conflicten te voorkomen
+private sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
     object Home : BottomNavItem("tab_home", "Home", Icons.Default.Home)
-    // AddCity is hier verwijderd, want het is geen tabblad meer
     object Chats : BottomNavItem("tab_chats", "Chats", Icons.Default.Chat)
     object Profile : BottomNavItem("tab_profile", "Profiel", Icons.Default.Person)
 }
@@ -29,11 +28,11 @@ sealed class BottomNavItem(val route: String, val label: String, val icon: Image
 @Composable
 fun MainScreen(
     onLogout: () -> Unit,
-    onNavigateToAddCity: () -> Unit // <--- NIEUW: We moeten dit doorgeven aan HomeScreen
+    onNavigateToAddCity: () -> Unit,
+    onNavigateToMyLocations: () -> Unit
 ) {
     val navController = rememberNavController()
 
-    // AddCity ook hier uit de lijst gehaald
     val items = listOf(
         BottomNavItem.Home,
         BottomNavItem.Chats,
@@ -70,16 +69,20 @@ fun MainScreen(
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Geef de callback door aan HomeScreen zodat de + knop werkt
             composable(BottomNavItem.Home.route) {
                 HomeScreen(onNavigateToAddCity = onNavigateToAddCity)
             }
 
-            // De AddCity composable is hier verwijderd.
-            // Die zit nu in MainActivity.kt als aparte route "add_city".
+            composable(BottomNavItem.Chats.route) {
+                ChatScreen()
+            }
 
-            composable(BottomNavItem.Chats.route) { ChatScreen() }
-            composable(BottomNavItem.Profile.route) { ProfileScreen(onLogout = onLogout) }
+            composable(BottomNavItem.Profile.route) {
+                ProfileScreen(
+                    onLogout = onLogout,
+                    onNavigateToMyLocations = onNavigateToMyLocations
+                )
+            }
         }
     }
 }

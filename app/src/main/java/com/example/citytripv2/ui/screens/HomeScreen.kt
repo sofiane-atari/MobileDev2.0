@@ -26,7 +26,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.citytripv2.model.CityTripLocation
 import com.example.citytripv2.viewmodel.HomeViewModel
-import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,15 +33,17 @@ fun HomeScreen(
     onNavigateToAddCity: () -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
-    val locations by viewModel.locations.collectAsState()
+    val allLocations by viewModel.locations.collectAsState()
 
-    // Kleuren uit je voorbeeld afbeelding (Ongeveer)
+    // Filter: Toon alleen spots, geen steden
+    val locations = allLocations.filter { it.category != "Stad" }
+
+    // Kleuren
     val headerBlue = Color(0xFF0089D0)
     val headerGreen = Color(0xFF00A88F)
     val bgGradient = Brush.horizontalGradient(listOf(headerBlue, headerGreen))
 
     Scaffold(
-        // We maken onze eigen header, dus geen standaard TopAppBar
         topBar = {
             Box(
                 modifier = Modifier
@@ -51,16 +52,15 @@ fun HomeScreen(
                     .background(bgGradient)
                     .padding(16.dp)
             ) {
-                // Titel of Search bar
                 TextField(
                     value = "",
                     onValueChange = {},
-                    placeholder = { Text("Search cities...", color = Color.Gray) },
+                    placeholder = { Text("Zoek steden...", color = Color.Gray) },
                     leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .clip(RoundedCornerShape(24.dp)), // Ronde zoekbalk
+                        .clip(RoundedCornerShape(24.dp)),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
@@ -73,24 +73,24 @@ fun HomeScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onNavigateToAddCity,
-                containerColor = Color(0xFF0089D0), // Blauwe kleur van de FAB
+                onClick = onNavigateToAddCity, // Directe actie!
+                containerColor = Color(0xFF0089D0),
                 contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Toevoegen")
             }
         },
-        floatingActionButtonPosition = FabPosition.Center // FAB in het midden zoals op de foto
+        floatingActionButtonPosition = FabPosition.Center
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F5F5)) // Lichte achtergrond
+                .background(Color(0xFFF5F5F5))
         ) {
             if (locations.isEmpty()) {
                 Text(
-                    text = "Nog geen steden.\nKlik op + om te beginnen!",
+                    text = "Nog geen locaties.\nKlik op + om te beginnen!",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.Gray,
                     modifier = Modifier.align(Alignment.Center),
@@ -122,13 +122,11 @@ fun LocationCard(location: CityTripLocation) {
             .height(220.dp)
     ) {
         Column {
-            // --- DE AFBEELDING ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.65f) // Afbeelding neemt 65% van kaart in
+                    .weight(0.65f)
             ) {
-                // Als er een URL is, laad die. Anders een placeholder kleur/gradient.
                 if (location.imageUrl != null) {
                     AsyncImage(
                         model = location.imageUrl,
@@ -137,7 +135,6 @@ fun LocationCard(location: CityTripLocation) {
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // Placeholder als er geen foto is (bv. een grijze box)
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -152,7 +149,6 @@ fun LocationCard(location: CityTripLocation) {
                     }
                 }
 
-                // Gradient Overlay voor leesbare tekst
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -164,14 +160,13 @@ fun LocationCard(location: CityTripLocation) {
                         )
                 )
 
-                // Tekst op de foto (Naam & Land)
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(12.dp)
                 ) {
                     Text(
-                        text = location.name, // "Paris"
+                        text = location.name,
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
@@ -179,41 +174,37 @@ fun LocationCard(location: CityTripLocation) {
                         color = Color.White
                     )
                     Text(
-                        text = location.country, // "France"
+                        text = location.country,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.9f)
                     )
                 }
             }
 
-            // --- DE INFO BALK ONDERAAN ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.35f) // Rest van de ruimte
+                    .weight(0.35f)
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Linkerkant: Categorie / Locaties count
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.LocationOn,
                         contentDescription = null,
-                        tint = Color(0xFF5A78FA), // Blauw icoontje
+                        tint = Color(0xFF5A78FA),
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = location.category, // Bv. "Stad" of "24 locations"
+                        text = location.category,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Gray
                     )
                 }
 
-                // Rechterkant: Rating & Sterren
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Cijfer (bv. 4.8)
                     Text(
                         text = if (location.rating > 0) String.format("%.1f", location.rating) else "Nieuw",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
@@ -221,9 +212,7 @@ fun LocationCard(location: CityTripLocation) {
                     )
                     Spacer(modifier = Modifier.width(4.dp))
 
-                    // Sterren (vast 5 sterren tonen)
-                    // (Voor nu hardcoded geel, later dynamisch maken obv rating)
-                    val starColor = Color(0xFFFFC107) // Goud/Geel
+                    val starColor = Color(0xFFFFC107)
                     Row {
                         repeat(5) { index ->
                             Icon(
