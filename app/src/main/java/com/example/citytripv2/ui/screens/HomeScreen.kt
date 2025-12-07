@@ -33,11 +33,13 @@ import com.example.citytripv2.viewmodel.HomeViewModel
 import androidx.compose.foundation.Image
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.foundation.clickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToAddCity: () -> Unit,
+    onNavigateToDetail: (String) -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     val allLocations by viewModel.locations.collectAsState()
@@ -187,7 +189,11 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(filteredLocations) { location ->
-                        LocationCard(location)
+                        LocationCard(
+                            location = location,
+                            // Geef de click door
+                            onClick = { onNavigateToDetail(location.id) }
+                        )
                     }
                 }
             }
@@ -365,7 +371,7 @@ fun FilterDialog(
 }
 
 @Composable
-fun LocationCard(location: CityTripLocation) {
+fun LocationCard(location: CityTripLocation, onClick: () -> Unit) {
     val imageBitmap: ImageBitmap? = remember(location.imageUrl) {
         if (location.imageUrl != null) {
             base64ToBitmap(location.imageUrl)
@@ -381,6 +387,7 @@ fun LocationCard(location: CityTripLocation) {
         modifier = Modifier
             .fillMaxWidth()
             .height(220.dp)
+            .clickable { onClick() }
     ) {
         Column {
             Box(

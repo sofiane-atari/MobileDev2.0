@@ -29,7 +29,8 @@ private sealed class BottomNavItem(val route: String, val label: String, val ico
 fun MainScreen(
     onLogout: () -> Unit,
     onNavigateToAddCity: () -> Unit,
-    onNavigateToMyLocations: () -> Unit
+    onNavigateToMyLocations: () -> Unit,
+    onNavigateToDetail: (String) -> Unit
 ) {
     val navController = rememberNavController()
 
@@ -70,7 +71,8 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Home.route) {
-                HomeScreen(onNavigateToAddCity = onNavigateToAddCity)
+                HomeScreen( onNavigateToAddCity = onNavigateToAddCity,
+                            onNavigateToDetail = onNavigateToDetail)
             }
 
             composable(BottomNavItem.Chats.route) {
