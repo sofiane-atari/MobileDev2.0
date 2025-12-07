@@ -1,27 +1,36 @@
 package com.example.citytripv2.ui.screens
 
 import android.content.Context
+import android.net.Uri
 import android.view.MotionEvent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.citytripv2.model.CityTripLocation
 import com.example.citytripv2.viewmodel.HomeViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -37,43 +46,48 @@ fun AddCityScreen(
     onNavigateBack: () -> Unit,
     onNavigateToRegisterCity: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
-    onCityAdded: (CityTripLocation) -> Unit
+    onCityAdded: (CityTripLocation, Uri?) -> Unit
 ) {
     val context = LocalContext.current
     val currentUser = FirebaseAuth.getInstance().currentUser
 
-    // --- DATA OPHALEN ---
     val allLocations by viewModel.locations.collectAsState()
     val myCities = allLocations.filter {
         it.category == "Stad" && it.userId == currentUser?.uid
     }
 
-    // --- STATE VARIABELEN ---
+    // --- STATE ---
     var locationName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
 
-    // Dropdown States
+    // FOTO STATE
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    // De Photo Picker Launcher
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> selectedImageUri = uri }
+    )
+
     var selectedCityObject by remember { mutableStateOf<CityTripLocation?>(null) }
     var isCityExpanded by remember { mutableStateOf(false) }
 
-    val categories = listOf("Restaurant", "Cafe", "Nature", "Housing", "Bezienswaardigheid")
+    val categories = listOf("Restaurant", "Cafe", "Natuur", "Hotel/Huis", "Bezienswaardigheid")
     var selectedCategory by remember { mutableStateOf(categories[0]) }
     var isCategoryExpanded by remember { mutableStateOf(false) }
 
-    // Locatie
     var selectedLatitude by remember { mutableStateOf(52.3676) }
     var selectedLongitude by remember { mutableStateOf(4.9041) }
 
-    var showSuccessDialog by remember { mutableStateOf(false) }
+    // Is aan het uploaden? (Visuele feedback)
+    var isUploading by remember { mutableStateOf(false) }
 
-    // --- KLEUREN ---
     val headerBlue = Color(0xFF0089D0)
     val headerGreen = Color(0xFF00A88F)
     val bgGradient = Brush.horizontalGradient(listOf(headerBlue, headerGreen))
 
     Scaffold(
         topBar = {
-            // Custom Gradient Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -83,19 +97,10 @@ fun AddCityScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Terug",
-                            tint = Color.White
-                        )
+                        Icon(Icons.Default.ArrowBack, "Terug", tint = Color.White)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Nieuwe Spot",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Nieuwe Spot", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -104,14 +109,14 @@ fun AddCityScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F5F5)) // Frisse lichte achtergrond
+                .background(Color(0xFFF5F5F5))
         ) {
-            // DEEL 1: De Kaart (in een nette Card)
+            // DEEL 1: Kaart
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.4f)
-                    .padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                    .weight(0.35f)
+                    .padding(16.dp),
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
@@ -126,19 +131,6 @@ fun AddCityScreen(
                             selectedLongitude = lon
                         }
                     )
-
-                    // Coordinaten overlay
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Lat: ${String.format("%.4f", selectedLatitude)}, Lon: ${String.format("%.4f", selectedLongitude)}",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
                 }
             }
 
@@ -146,17 +138,41 @@ fun AddCityScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.6f)
-                    .padding(16.dp)
+                    .weight(0.65f)
+                    .padding(horizontal = 16.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "Details invullen",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
+                // --- FOTO KIEZER KNOP ---
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White)
+                        .clickable {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "Gekozen foto",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
+                        Text("Klik om te wijzigen", color = Color.White)
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.AddAPhoto, null, tint = headerBlue, modifier = Modifier.size(40.dp))
+                            Text("Voeg een foto toe", color = headerBlue)
+                        }
+                    }
+                }
 
                 // 1. STAD KIEZEN
                 if (myCities.isEmpty()) {
@@ -165,11 +181,10 @@ fun AddCityScreen(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = headerBlue)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text("Maak je eerste stad aan")
                     }
                 } else {
+                    // HIER ZAT HET PROBLEEM: We zetten de dropdown en de knop naast elkaar in een Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -177,7 +192,7 @@ fun AddCityScreen(
                         ExposedDropdownMenuBox(
                             expanded = isCityExpanded,
                             onExpandedChange = { isCityExpanded = !isCityExpanded },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f) // Neemt de meeste ruimte
                         ) {
                             OutlinedTextField(
                                 value = selectedCityObject?.name ?: "Kies een stad",
@@ -212,16 +227,20 @@ fun AddCityScreen(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
+                        // Het plus-knopje om alsnog een nieuwe stad aan te maken
                         IconButton(
                             onClick = onNavigateToRegisterCity,
-                            colors = IconButtonDefaults.iconButtonColors(containerColor = headerBlue, contentColor = Color.White)
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = headerBlue,
+                                contentColor = Color.White
+                            )
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Nieuwe stad")
+                            Icon(Icons.Default.Add, contentDescription = "Nieuwe stad toevoegen")
                         }
                     }
                 }
 
-                // 2. CATEGORIE KIEZEN
+                // 2. CATEGORIE
                 ExposedDropdownMenuBox(
                     expanded = isCategoryExpanded,
                     onExpandedChange = { isCategoryExpanded = !isCategoryExpanded },
@@ -262,7 +281,7 @@ fun AddCityScreen(
                 OutlinedTextField(
                     value = locationName,
                     onValueChange = { locationName = it },
-                    label = { Text("Naam van plek (bv. Eiffeltoren) *") },
+                    label = { Text("Naam van plek *") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -292,6 +311,8 @@ fun AddCityScreen(
                 Button(
                     onClick = {
                         if (locationName.isNotBlank() && selectedCityObject != null) {
+                            isUploading = true
+
                             val newLocation = CityTripLocation(
                                 id = System.currentTimeMillis().toString(),
                                 name = locationName,
@@ -304,41 +325,24 @@ fun AddCityScreen(
                                 imageUrl = null,
                                 rating = 0f
                             )
-                            onCityAdded(newLocation)
-                            showSuccessDialog = true
+                            onCityAdded(newLocation, selectedImageUri)
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = headerBlue),
                     shape = RoundedCornerShape(8.dp),
-                    enabled = locationName.isNotBlank() && selectedCityObject != null
+                    enabled = locationName.isNotBlank() && selectedCityObject != null && !isUploading
                 ) {
-                    Text("Opslaan", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    if (isUploading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Opslaan", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(50.dp))
+                Spacer(modifier = Modifier.height(100.dp))
             }
         }
-    }
-
-    if (showSuccessDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showSuccessDialog = false
-                onNavigateBack()
-            },
-            title = { Text("Succes!") },
-            text = { Text("'$locationName' is toegevoegd aan ${selectedCityObject?.name}.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showSuccessDialog = false
-                    onNavigateBack()
-                }) { Text("OK") }
-            },
-            containerColor = Color.White
-        )
     }
 }
 

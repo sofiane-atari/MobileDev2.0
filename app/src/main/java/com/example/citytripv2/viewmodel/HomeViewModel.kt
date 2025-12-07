@@ -1,22 +1,28 @@
 package com.example.citytripv2.viewmodel
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.citytripv2.model.CityTripLocation
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 
 class HomeViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // De lijst met locaties die we in de UI tonen
     private val _locations = MutableStateFlow<List<CityTripLocation>>(emptyList())
     val locations: StateFlow<List<CityTripLocation>> = _locations.asStateFlow()
 
@@ -25,55 +31,110 @@ class HomeViewModel : ViewModel() {
     }
 
     private fun fetchLocations() {
-        val userId = auth.currentUser?.uid
-        if (userId == null) return
+        val collectionName = "locations"
+        Log.d("HomeViewModel", "Luisteren naar collectie: $collectionName")
 
-
-        db.collection("locations")
-            .orderBy("id", Query.Direction.DESCENDING)
+        db.collection(collectionName)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
-                    Log.w("HomeViewModel", "Listen failed.", e)
+                    Log.e("HomeViewModel", "Fout bij luisteren:", e)
                     return@addSnapshotListener
                 }
 
-                if (snapshot != null) {
-                    val list = snapshot.documents.mapNotNull { doc ->
-                        // Zet de Firestore JSON om naar jouw CityTripLocation object
-                        doc.toObject(CityTripLocation::class.java)
+                if (snapshot != null && !snapshot.isEmpty) {
+                    try {
+                        val list = snapshot.toObjects(CityTripLocation::class.java)
+                        _locations.value = list
+                    } catch (err: Exception) {
+                        Log.e("HomeViewModel", "Fout bij omzetten data:", err)
                     }
-                    _locations.value = list
+                } else {
+                    _locations.value = emptyList()
                 }
             }
     }
 
-    fun addLocation(location: CityTripLocation) {
+    fun addLocation(location: CityTripLocation, imageUri: Uri?, context: Context, onSuccess: () -> Unit) {
         val userId = auth.currentUser?.uid ?: return
 
-        // Voeg de userId toe aan het object voor veiligheid
-        val locationWithUser = location.copy(userId = userId)
+        viewModelScope.launch {
+            // 1. Converteer afbeelding naar Base64 String (indien aanwezig)
+            val base64Image = if (imageUri != null) {
+                encodeImageToBase64(context, imageUri)
+            } else {
+                null
+            }
 
-        db.collection("locations")
-            .document(location.id) // We gebruiken de ID die je in AddCityScreen hebt gemaakt
-            .set(locationWithUser)
-            .addOnSuccessListener {
-                Log.d("HomeViewModel", "Locatie succesvol opgeslagen!")
-            }
-            .addOnFailureListener { e ->
-                Log.w("HomeViewModel", "Fout bij opslaan", e)
-            }
+            // 2. Update het locatie object
+            val locationToSave = location.copy(
+                userId = userId,
+                imageUrl = base64Image
+            )
+
+            // 3. Opslaan
+            db.collection("locations")
+                .document(locationToSave.id)
+                .set(locationToSave)
+                .addOnSuccessListener {
+                    Log.d("HomeViewModel", "Opgeslagen!")
+                    onSuccess()
+                }
+                .addOnFailureListener { e ->
+                    Log.e("HomeViewModel", "Fout bij opslaan (Waarschijnlijk te groot):", e)
+                }
+        }
     }
 
     fun deleteLocation(locationId: String, onSuccess: () -> Unit) {
-        db.collection("locations")
-            .document(locationId)
-            .delete()
-            .addOnSuccessListener {
-                Log.d("HomeViewModel", "Locatie verwijderd!")
-                onSuccess()
-            }
-            .addOnFailureListener { e ->
-                Log.e("HomeViewModel", "Fout bij verwijderen", e)
-            }
+        db.collection("locations").document(locationId).delete()
+            .addOnSuccessListener { onSuccess() }
     }
+
+    // --- VERBETERDE COMPRESSIE LOGICA ---
+    fun encodeImageToBase64(context: Context, imageUri: Uri): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(imageUri)
+            val originalBitmap = BitmapFactory.decodeStream(inputStream) ?: return null
+
+            // Resize naar max 300px breed/hoog
+            val resizedBitmap = resizeBitmap(originalBitmap, 300)
+
+            val outputStream = ByteArrayOutputStream()
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 40, outputStream)
+
+            val byteArray = outputStream.toByteArray()
+
+            // Als het nog groter is dan 900 KB: geen foto opslaan
+            if (byteArray.size > 900 * 1024) {
+                Log.e("encodeImage", "Foto alsnog te groot (${byteArray.size} bytes)")
+                return null
+            }
+
+            Base64.encodeToString(byteArray, Base64.NO_WRAP)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun resizeBitmap(bitmap: Bitmap, maxSize: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val ratio = width.toFloat() / height
+        val newWidth: Int
+        val newHeight: Int
+
+        if (ratio > 1) {
+            newWidth = maxSize
+            newHeight = (maxSize / ratio).toInt()
+        } else {
+            newHeight = maxSize
+            newWidth = (maxSize * ratio).toInt()
+        }
+
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+    }
+
 }

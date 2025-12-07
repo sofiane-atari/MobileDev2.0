@@ -115,10 +115,15 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
                 onNavigateToRegisterCity = {
                     navController.navigate("register_city")
                 },
-                onCityAdded = { newLocation ->
-                    homeViewModel.addLocation(newLocation)
-                    Toast.makeText(context, "Opgeslagen!", Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
+                // UPDATE: De callback heeft nu (location, imageUri)
+                onCityAdded = { newLocation, imageUri ->
+
+                    // We geven 'context' mee aan de ViewModel functie!
+                    homeViewModel.addLocation(newLocation, imageUri, context) {
+                        // Dit blok wordt pas uitgevoerd als alles klaar is
+                        Toast.makeText(context, "Opgeslagen!", Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
                 }
             )
         }
