@@ -9,8 +9,10 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.citytripv2.model.CityTripLocation
+import com.example.citytripv2.model.Review
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +27,10 @@ class HomeViewModel : ViewModel() {
 
     private val _locations = MutableStateFlow<List<CityTripLocation>>(emptyList())
     val locations: StateFlow<List<CityTripLocation>> = _locations.asStateFlow()
+
+    // Lijst met reviews (voor Detail scherm)
+    private val _reviews = MutableStateFlow<List<Review>>(emptyList())
+    val reviews: StateFlow<List<Review>> = _reviews.asStateFlow()
 
     init {
         fetchLocations()
@@ -54,7 +60,22 @@ class HomeViewModel : ViewModel() {
             }
     }
 
-    // NIEUW: Haal 1 specifieke locatie op (voor het detailscherm)
+    //  Haal reviews op voor een specifieke locatie
+    fun fetchReviews(locationId: String) {
+        db.collection("locations").document(locationId)
+            .collection("reviews")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) return@addSnapshotListener
+
+                if (snapshot != null) {
+                    val reviewList = snapshot.toObjects(Review::class.java)
+                    _reviews.value = reviewList
+                }
+            }
+    }
+
+    //  Haal 1 specifieke locatie op (voor het detailscherm)
     fun getLocationById(id: String, onResult: (CityTripLocation?) -> Unit) {
         // We zoeken eerst in de lokale lijst (sneller)
         val local = _locations.value.find { it.id == id }
@@ -72,24 +93,25 @@ class HomeViewModel : ViewModel() {
             }
     }
 
-    // NIEUW: Review toevoegen
+    //  Review toevoegen
     fun addReview(locationId: String, rating: Int, comment: String, onSuccess: () -> Unit) {
         val user = auth.currentUser ?: return
 
-        val reviewData = hashMapOf(
-            "userId" to user.uid,
-            "userEmail" to user.email,
-            "rating" to rating,
-            "comment" to comment,
-            "timestamp" to System.currentTimeMillis()
+        val review = Review(
+            id = System.currentTimeMillis().toString(),
+            userId = user.uid,
+            userEmail = user.email ?: "Anoniem",
+            rating = rating,
+            comment = comment,
+            timestamp = System.currentTimeMillis()
         )
 
-        // 1. Voeg review toe aan subcollectie
         db.collection("locations").document(locationId)
             .collection("reviews")
-            .add(reviewData)
+            .add(review)
             .addOnSuccessListener {
-                // 2. Update de gemiddelde rating van de hoofdlocatie (Simpele update: overschrijf met nieuwe)
+                // Update ook de rating in het hoofddocument (simpel gemiddelde)
+                // Voor nu overschrijven we hem even om te laten zien dat het werkt
                 db.collection("locations").document(locationId)
                     .update("rating", rating.toFloat())
                     .addOnSuccessListener { onSuccess() }
