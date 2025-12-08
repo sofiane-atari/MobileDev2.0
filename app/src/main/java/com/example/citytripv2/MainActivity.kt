@@ -17,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.citytripv2.ui.auth.LoginScreen
 import com.example.citytripv2.ui.auth.RegisterScreen
+import com.example.citytripv2.ui.chats.ChatDetailScreen
 import com.example.citytripv2.ui.screens.AddCityScreen
 import com.example.citytripv2.ui.screens.MainScreen
 import com.example.citytripv2.ui.screens.MyLocationsScreen
@@ -103,6 +104,9 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
                 },
                 onNavigateToDetail = { locationId ->
                     navController.navigate("detail/$locationId")
+                },
+                onNavigateToChat = { chatId, email ->
+                    navController.navigate("chat_detail/$chatId/$email")
                 }
             )
         }
@@ -161,6 +165,22 @@ fun CityTripNavigation(startDestination: String, modifier: Modifier = Modifier) 
             if (locationId != null) {
                 LocationDetailScreen(
                     locationId = locationId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToChat = { chatId, email ->
+                        navController.navigate("chat_detail/$chatId/$email")
+                    }
+                )
+            }
+        }
+
+        composable("chat_detail/{chatId}/{email}") { backStackEntry ->
+            val chatId = backStackEntry.arguments?.getString("chatId")
+            val email = backStackEntry.arguments?.getString("email")
+
+            if (chatId != null && email != null) {
+                ChatDetailScreen(
+                    chatId = chatId,
+                    otherUserEmail = email,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

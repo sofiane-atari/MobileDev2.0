@@ -16,7 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.citytripv2.ui.screens.ChatScreen
+import com.example.citytripv2.ui.chats.ChatScreen
 
 // Private gemaakt om conflicten te voorkomen
 private sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
@@ -30,7 +30,8 @@ fun MainScreen(
     onLogout: () -> Unit,
     onNavigateToAddCity: () -> Unit,
     onNavigateToMyLocations: () -> Unit,
-    onNavigateToDetail: (String) -> Unit
+    onNavigateToDetail: (String) -> Unit,
+    onNavigateToChat: (String, String) -> Unit
 ) {
     val navController = rememberNavController()
 
@@ -76,7 +77,7 @@ fun MainScreen(
             }
 
             composable(BottomNavItem.Chats.route) {
-                ChatScreen()
+                ChatScreen(onNavigateToChat = onNavigateToChat)
             }
 
             composable(BottomNavItem.Profile.route) {

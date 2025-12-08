@@ -34,6 +34,7 @@ import androidx.compose.foundation.Image
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.FilterAlt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,7 +133,7 @@ fun HomeScreen(
                             }
                         ) {
                             Icon(
-                                Icons.Default.FilterList,
+                                Icons.Default.FilterAlt,
                                 contentDescription = "Filter",
                                 tint = headerBlue
                             )

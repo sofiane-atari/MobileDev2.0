@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
@@ -33,13 +34,16 @@ import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.citytripv2.viewmodel.ChatViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationDetailScreen(
     locationId: String,
     onNavigateBack: () -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    onNavigateToChat: (String, String) -> Unit,
+    viewModel: HomeViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel()
 ) {
     var location by remember { mutableStateOf<CityTripLocation?>(null) }
     val reviews by viewModel.reviews.collectAsState()
@@ -156,6 +160,29 @@ fun LocationDetailScreen(
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+
+                item {
+                    if (!isMyOwnPost) {
+                        Button(
+                            onClick = {
+                                // Start chat met de eigenaar van de locatie
+                                chatViewModel.startChat(
+                                    otherUserId = loc.userId,
+                                    otherUserEmail = "Eigenaar" // Eigenlijk zou je hier de email uit loc moeten halen, maar die hebben we niet opgeslagen in Location.
+                                    // Voor nu is 'Eigenaar' prima, of je update je Location model om ook userEmail op te slaan.
+                                ) { chatId ->
+                                    onNavigateToChat(chatId, "Eigenaar")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A88F)) // Groen
+                        ) {
+                            Icon(Icons.Default.Chat, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Stuur bericht naar eigenaar")
+                        }
                     }
                 }
 
