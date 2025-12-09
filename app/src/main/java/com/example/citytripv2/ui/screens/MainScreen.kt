@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import com.example.citytripv2.ui.chats.ChatScreen
 // Private gemaakt om conflicten te voorkomen
 private sealed class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
     object Home : BottomNavItem("tab_home", "Home", Icons.Default.Home)
+    object Map : BottomNavItem("tab_map", "Map", Icons.Default.Map)
     object Chats : BottomNavItem("tab_chats", "Chats", Icons.Default.Chat)
     object Profile : BottomNavItem("tab_profile", "Profiel", Icons.Default.Person)
 }
@@ -37,6 +39,7 @@ fun MainScreen(
 
     val items = listOf(
         BottomNavItem.Home,
+        BottomNavItem.Map,
         BottomNavItem.Chats,
         BottomNavItem.Profile
     )
@@ -74,6 +77,10 @@ fun MainScreen(
             composable(BottomNavItem.Home.route) {
                 HomeScreen( onNavigateToAddCity = onNavigateToAddCity,
                             onNavigateToDetail = onNavigateToDetail)
+            }
+
+            composable(BottomNavItem.Map.route) {
+                MapScreen(onNavigateToDetail = onNavigateToDetail)
             }
 
             composable(BottomNavItem.Chats.route) {

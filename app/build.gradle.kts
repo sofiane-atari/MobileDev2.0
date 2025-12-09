@@ -75,7 +75,10 @@ dependencies {
     // 3. OSMDroid
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
-    // 4. Extra's
+    // 4. Google Play Services Location
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+
+    // 5. Extra's
     implementation("androidx.compose.material:material-icons-extended:1.6.7")
     implementation("io.coil-kt:coil-compose:2.6.0")
 
