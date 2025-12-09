@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -48,9 +49,9 @@ fun MapScreen(
     val context = LocalContext.current
     val locations by viewModel.locations.collectAsState()
 
-    // Filter states
-    var selectedCity by remember { mutableStateOf<String?>(null) }
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    // Filter states - multiple selections
+    var selectedCities by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showFilterDialog by remember { mutableStateOf(false) }
 
     // User location state
@@ -98,11 +99,11 @@ fun MapScreen(
         }
     }
 
-    // Filter locations based on selected city and category
-    val filteredLocations = remember(locations, selectedCity, selectedCategory) {
+    // Filter locations based on selected cities and categories
+    val filteredLocations = remember(locations, selectedCities, selectedCategories) {
         locations.filter { location ->
-            val cityMatch = selectedCity == null || location.city == selectedCity
-            val categoryMatch = selectedCategory == null || location.category == selectedCategory
+            val cityMatch = selectedCities.isEmpty() || location.city in selectedCities
+            val categoryMatch = selectedCategories.isEmpty() || location.category in selectedCategories
             cityMatch && categoryMatch
         }
     }
@@ -115,176 +116,212 @@ fun MapScreen(
         locations.map { it.category }.distinct().sorted() 
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Map") },
-                actions = {
-                    IconButton(onClick = { showFilterDialog = true }) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filters")
-                    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Map view (fullscreen)
+        AndroidView(
+            factory = { ctx ->
+                Configuration.getInstance().load(
+                    ctx,
+                    ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
+                )
+                
+                MapView(ctx).apply {
+                    setTileSource(TileSourceFactory.MAPNIK)
+                    setMultiTouchControls(true)
+                    
+                    // Set initial position (Belgium center)
+                    controller.setZoom(8.0)
+                    controller.setCenter(GeoPoint(50.8503, 4.3517)) // Brussels
                 }
-            )
-        }
-    ) { padding ->
-        Column(
+            },
+            modifier = Modifier.fillMaxSize(),
+            update = { mapView ->
+                mapView.overlays.clear()
+                
+                // Add user location marker if available
+                if (userLocation != null) {
+                    val userMarker = Marker(mapView).apply {
+                        position = GeoPoint(userLocation!!.latitude, userLocation!!.longitude)
+                        title = "Jouw Locatie"
+                        snippet = "Je bent hier"
+                        icon = createCustomMarker(context, "user")
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    }
+                    mapView.overlays.add(userMarker)
+                }
+                
+                // Add markers for filtered locations
+                filteredLocations.forEach { location ->
+                    val marker = Marker(mapView).apply {
+                        position = GeoPoint(location.latitude, location.longitude)
+                        title = location.name
+                        snippet = "${location.city} - ${location.category}"
+                        icon = createCustomMarker(context, location.category)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        
+                        setOnMarkerClickListener { clickedMarker, _ ->
+                            selectedLocation = location
+                            
+                            // Calculate distance if user location is available
+                            if (userLocation != null) {
+                                val distance = calculateDistance(
+                                    userLocation!!.latitude,
+                                    userLocation!!.longitude,
+                                    location.latitude,
+                                    location.longitude
+                                )
+                                distanceToUser = distance
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Locatie permissie nodig voor afstandsberekening",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            
+                            true
+                        }
+                    }
+                    mapView.overlays.add(marker)
+                }
+                
+                mapView.invalidate()
+            }
+        )
+
+        // Compact header at the top (covers status bar area)
+        Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 4.dp
         ) {
-            // Active filters display
-            if (selectedCity != null || selectedCategory != null) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    tonalElevation = 2.dp
+            Row(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Map",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                IconButton(onClick = { showFilterDialog = true }) {
+                    Icon(Icons.Default.FilterList, contentDescription = "Filters")
+                }
+            }
+        }
+
+        // Active filters display (below header)
+        if (selectedCities.isNotEmpty() || selectedCategories.isNotEmpty()) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(top = 60.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                tonalElevation = 2.dp
+            ) {
+                LazyRow(
+                    modifier = Modifier.padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        selectedCity?.let { city ->
-                            FilterChip(
-                                selected = true,
-                                onClick = { selectedCity = null },
-                                label = { Text("Stad: $city") }
-                            )
-                        }
-                        selectedCategory?.let { category ->
-                            FilterChip(
-                                selected = true,
-                                onClick = { selectedCategory = null },
-                                label = { Text("Categorie: $category") }
-                            )
-                        }
+                    items(selectedCities.toList()) { city ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedCities = selectedCities - city },
+                            label = { Text(city, style = MaterialTheme.typography.bodySmall) }
+                        )
+                    }
+                    items(selectedCategories.toList()) { category ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedCategories = selectedCategories - category },
+                            label = { Text(category, style = MaterialTheme.typography.bodySmall) }
+                        )
                     }
                 }
             }
+        }
 
-            // Distance info card
-            if (selectedLocation != null && distanceToUser != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = selectedLocation!!.name,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "Afstand: %.2f km".format(distanceToUser!! / 1000),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+        // Distance info card (bottom)
+        if (selectedLocation != null && distanceToUser != null) {
+            Card(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = selectedLocation!!.name,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Afstand: %.2f km".format(distanceToUser!! / 1000),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { 
+                            selectedLocation = null
+                            distanceToUser = null
+                        }) {
+                            Text("Sluiten")
+                        }
                         TextButton(onClick = { 
                             onNavigateToDetail(selectedLocation!!.id) 
                         }) {
-                            Text("Bekijk details")
+                            Text("Details")
                         }
                     }
                 }
             }
-
-            // Map view
-            AndroidView(
-                factory = { ctx ->
-                    Configuration.getInstance().load(
-                        ctx,
-                        ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
-                    )
-                    
-                    MapView(ctx).apply {
-                        setTileSource(TileSourceFactory.MAPNIK)
-                        setMultiTouchControls(true)
-                        
-                        // Set initial position (Belgium center)
-                        controller.setZoom(8.0)
-                        controller.setCenter(GeoPoint(50.8503, 4.3517)) // Brussels
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-                update = { mapView ->
-                    mapView.overlays.clear()
-                    
-                    // Add user location marker if available
-                    if (userLocation != null) {
-                        val userMarker = Marker(mapView).apply {
-                            position = GeoPoint(userLocation!!.latitude, userLocation!!.longitude)
-                            title = "Jouw Locatie"
-                            snippet = "Je bent hier"
-                            icon = createCustomMarker(context, "user")
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        }
-                        mapView.overlays.add(userMarker)
-                    }
-                    
-                    // Add markers for filtered locations
-                    filteredLocations.forEach { location ->
-                        val marker = Marker(mapView).apply {
-                            position = GeoPoint(location.latitude, location.longitude)
-                            title = location.name
-                            snippet = "${location.city} - ${location.category}"
-                            icon = createCustomMarker(context, location.category)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            
-                            setOnMarkerClickListener { clickedMarker, _ ->
-                                selectedLocation = location
-                                
-                                // Calculate distance if user location is available
-                                if (userLocation != null) {
-                                    val distance = calculateDistance(
-                                        userLocation!!.latitude,
-                                        userLocation!!.longitude,
-                                        location.latitude,
-                                        location.longitude
-                                    )
-                                    distanceToUser = distance
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Locatie permissie nodig voor afstandsberekening",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                
-                                true
-                            }
-                        }
-                        mapView.overlays.add(marker)
-                    }
-                    
-                    mapView.invalidate()
-                }
-            )
         }
 
         // Filter dialog
         if (showFilterDialog) {
             AlertDialog(
                 onDismissRequest = { showFilterDialog = false },
-                title = { Text("Filters") },
+                title = { Text("Filters - Selecteer meerdere") },
                 text = {
                     Column {
-                        Text("Stad", style = MaterialTheme.typography.titleSmall)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Steden", style = MaterialTheme.typography.titleSmall)
+                            if (selectedCities.isNotEmpty()) {
+                                TextButton(onClick = { selectedCities = emptySet() }) {
+                                    Text("Wis alles", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(vertical = 8.dp)
                         ) {
-                            item {
-                                FilterChip(
-                                    selected = selectedCity == null,
-                                    onClick = { selectedCity = null },
-                                    label = { Text("Alle") }
-                                )
-                            }
                             items(cities) { city ->
                                 FilterChip(
-                                    selected = selectedCity == city,
-                                    onClick = { selectedCity = city },
+                                    selected = city in selectedCities,
+                                    onClick = { 
+                                        selectedCities = if (city in selectedCities) {
+                                            selectedCities - city
+                                        } else {
+                                            selectedCities + city
+                                        }
+                                    },
                                     label = { Text(city) }
                                 )
                             }
@@ -292,22 +329,32 @@ fun MapScreen(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        Text("Categorie", style = MaterialTheme.typography.titleSmall)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Categorieën", style = MaterialTheme.typography.titleSmall)
+                            if (selectedCategories.isNotEmpty()) {
+                                TextButton(onClick = { selectedCategories = emptySet() }) {
+                                    Text("Wis alles", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(vertical = 8.dp)
                         ) {
-                            item {
-                                FilterChip(
-                                    selected = selectedCategory == null,
-                                    onClick = { selectedCategory = null },
-                                    label = { Text("Alle") }
-                                )
-                            }
                             items(categories) { category ->
                                 FilterChip(
-                                    selected = selectedCategory == category,
-                                    onClick = { selectedCategory = category },
+                                    selected = category in selectedCategories,
+                                    onClick = { 
+                                        selectedCategories = if (category in selectedCategories) {
+                                            selectedCategories - category
+                                        } else {
+                                            selectedCategories + category
+                                        }
+                                    },
                                     label = { Text(category) }
                                 )
                             }
@@ -316,7 +363,15 @@ fun MapScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { showFilterDialog = false }) {
-                        Text("Sluiten")
+                        Text("Toepassen")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { 
+                        selectedCities = emptySet()
+                        selectedCategories = emptySet()
+                    }) {
+                        Text("Reset")
                     }
                 }
             )
@@ -361,7 +416,7 @@ private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Do
 
 // Create custom marker based on category
 private fun createCustomMarker(context: Context, category: String): android.graphics.drawable.Drawable {
-    val size = 80
+    val size = 120  // Increased from 80 to 120
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -369,106 +424,162 @@ private fun createCustomMarker(context: Context, category: String): android.grap
     // Define colors and shapes for each category
     when (category.lowercase()) {
         "user" -> {
-            // Blue circle with dot for user location
-            paint.color = Color.parseColor("#2196F3")
+            // Bright blue circle with gradient effect for user location
+            // Outer glow
+            paint.color = Color.parseColor("#40C4FF") // Lighter blue
             paint.style = Paint.Style.FILL
-            canvas.drawCircle(size / 2f, size / 2f, 20f, paint)
+            canvas.drawCircle(size / 2f, size / 2f, 42f, paint)
             
+            // Main circle - vibrant blue
+            paint.color = Color.parseColor("#0091EA") // Vivid blue
+            canvas.drawCircle(size / 2f, size / 2f, 30f, paint)
+            
+            // Inner white dot
             paint.color = Color.WHITE
-            canvas.drawCircle(size / 2f, size / 2f, 8f, paint)
+            canvas.drawCircle(size / 2f, size / 2f, 12f, paint)
             
-            paint.color = Color.parseColor("#2196F3")
-            paint.strokeWidth = 4f
+            // Pulsing ring effect
+            paint.color = Color.parseColor("#00B0FF") // Cyan blue
+            paint.strokeWidth = 6f
             paint.style = Paint.Style.STROKE
-            canvas.drawCircle(size / 2f, size / 2f, 28f, paint)
+            canvas.drawCircle(size / 2f, size / 2f, 42f, paint)
         }
         "stad" -> {
-            // Purple star for cities
-            paint.color = Color.parseColor("#9C27B0")
+            // Vibrant purple/magenta star for cities
+            // Shadow
+            paint.color = Color.parseColor("#4A148C") // Dark purple shadow
             paint.style = Paint.Style.FILL
-            drawStar(canvas, paint, size / 2f, size / 2f, 25f, 12f)
+            drawStar(canvas, paint, size / 2f + 2, size / 2f + 2, 38f, 18f)
             
-            paint.color = Color.WHITE
-            paint.strokeWidth = 3f
+            // Main star - bright magenta
+            paint.color = Color.parseColor("#E040FB") // Bright magenta
+            drawStar(canvas, paint, size / 2f, size / 2f, 38f, 18f)
+            
+            // Yellow/gold border for contrast
+            paint.color = Color.parseColor("#FFD600") // Gold
+            paint.strokeWidth = 4f
             paint.style = Paint.Style.STROKE
-            drawStar(canvas, paint, size / 2f, size / 2f, 25f, 12f)
+            drawStar(canvas, paint, size / 2f, size / 2f, 38f, 18f)
         }
         "hotel" -> {
-            // Orange house/building for hotels
-            paint.color = Color.parseColor("#FF9800")
+            // Bright orange/amber house for hotels
+            // Shadow
+            paint.color = Color.parseColor("#E65100") // Dark orange shadow
             paint.style = Paint.Style.FILL
-            canvas.drawRect(size / 2f - 20, size / 2f - 10, size / 2f + 20, size / 2f + 20, paint)
+            canvas.drawRect(size / 2f - 28, size / 2f - 13, size / 2f + 32, size / 2f + 32, paint)
             
-            // Roof
+            // Main building - vibrant orange
+            paint.color = Color.parseColor("#FF6D00") // Vivid orange
+            canvas.drawRect(size / 2f - 30, size / 2f - 15, size / 2f + 30, size / 2f + 30, paint)
+            
+            // Roof - red gradient
             val roofPath = Path()
-            roofPath.moveTo(size / 2f, size / 2f - 25)
-            roofPath.lineTo(size / 2f - 25, size / 2f - 10)
-            roofPath.lineTo(size / 2f + 25, size / 2f - 10)
+            roofPath.moveTo(size / 2f, size / 2f - 38)
+            roofPath.lineTo(size / 2f - 38, size / 2f - 15)
+            roofPath.lineTo(size / 2f + 38, size / 2f - 15)
             roofPath.close()
+            paint.color = Color.parseColor("#DD2C00") // Bright red roof
             canvas.drawPath(roofPath, paint)
             
-            // Border
+            // Windows - yellow
+            paint.color = Color.parseColor("#FFFF00") // Bright yellow
+            canvas.drawRect(size / 2f - 20, size / 2f, size / 2f - 10, size / 2f + 10, paint)
+            canvas.drawRect(size / 2f + 10, size / 2f, size / 2f + 20, size / 2f + 10, paint)
+            
+            // White border
             paint.color = Color.WHITE
-            paint.strokeWidth = 3f
+            paint.strokeWidth = 4f
             paint.style = Paint.Style.STROKE
-            canvas.drawRect(size / 2f - 20, size / 2f - 10, size / 2f + 20, size / 2f + 20, paint)
+            canvas.drawRect(size / 2f - 30, size / 2f - 15, size / 2f + 30, size / 2f + 30, paint)
             canvas.drawPath(roofPath, paint)
         }
         "horeca" -> {
-            // Red fork and knife for restaurants
-            paint.color = Color.parseColor("#F44336")
+            // Vibrant red circle for restaurants
+            // Shadow/glow
+            paint.color = Color.parseColor("#FF5252") // Light red glow
             paint.style = Paint.Style.FILL
-            canvas.drawCircle(size / 2f, size / 2f, 22f, paint)
+            canvas.drawCircle(size / 2f, size / 2f, 38f, paint)
             
-            paint.color = Color.WHITE
-            paint.strokeWidth = 4f
+            // Main circle - bright red
+            paint.color = Color.parseColor("#FF1744") // Vivid red
+            canvas.drawCircle(size / 2f, size / 2f, 33f, paint)
+            
+            // Golden/yellow cutlery for contrast
+            paint.color = Color.parseColor("#FFD740") // Golden yellow
+            paint.strokeWidth = 6f
             paint.style = Paint.Style.STROKE
             
             // Fork
-            canvas.drawLine(size / 2f - 8, size / 2f - 10, size / 2f - 8, size / 2f + 10, paint)
-            canvas.drawLine(size / 2f - 12, size / 2f - 10, size / 2f - 12, size / 2f, paint)
-            canvas.drawLine(size / 2f - 4, size / 2f - 10, size / 2f - 4, size / 2f, paint)
+            canvas.drawLine(size / 2f - 12, size / 2f - 15, size / 2f - 12, size / 2f + 15, paint)
+            canvas.drawLine(size / 2f - 18, size / 2f - 15, size / 2f - 18, size / 2f, paint)
+            canvas.drawLine(size / 2f - 6, size / 2f - 15, size / 2f - 6, size / 2f, paint)
             
             // Knife
-            canvas.drawLine(size / 2f + 8, size / 2f - 10, size / 2f + 8, size / 2f + 10, paint)
-            canvas.drawCircle(size / 2f + 8, size / 2f - 10, 3f, paint)
+            canvas.drawLine(size / 2f + 12, size / 2f - 15, size / 2f + 12, size / 2f + 15, paint)
+            paint.style = Paint.Style.FILL
+            canvas.drawCircle(size / 2f + 12, size / 2f - 15, 5f, paint)
         }
         "bezienswaardigheid" -> {
-            // Green camera for attractions
-            paint.color = Color.parseColor("#4CAF50")
+            // Vibrant green camera for attractions
+            // Shadow
+            paint.color = Color.parseColor("#2E7D32") // Dark green shadow
             paint.style = Paint.Style.FILL
-            canvas.drawRoundRect(size / 2f - 22, size / 2f - 15, size / 2f + 22, size / 2f + 15, 5f, 5f, paint)
+            canvas.drawRoundRect(size / 2f - 31, size / 2f - 21, size / 2f + 35, size / 2f + 25, 8f, 8f, paint)
             
-            // Lens
-            paint.color = Color.parseColor("#81C784")
-            canvas.drawCircle(size / 2f + 5, size / 2f, 10f, paint)
+            // Main camera body - bright green
+            paint.color = Color.parseColor("#00E676") // Neon green
+            canvas.drawRoundRect(size / 2f - 33, size / 2f - 23, size / 2f + 33, size / 2f + 23, 8f, 8f, paint)
             
-            // Flash
+            // Lens - cyan/blue
+            paint.color = Color.parseColor("#00B8D4") // Bright cyan
+            canvas.drawCircle(size / 2f + 8, size / 2f, 15f, paint)
+            
+            // Lens reflection
+            paint.color = Color.parseColor("#E0F7FA") // Light cyan
+            canvas.drawCircle(size / 2f + 10, size / 2f - 3, 6f, paint)
+            
+            // Flash - bright yellow
+            paint.color = Color.parseColor("#FFFF00") // Bright yellow flash
+            canvas.drawRect(size / 2f - 27, size / 2f - 30, size / 2f - 15, size / 2f - 23, paint)
+            
+            // Border - white
             paint.color = Color.WHITE
-            canvas.drawRect(size / 2f - 18, size / 2f - 20, size / 2f - 10, size / 2f - 15, paint)
+            paint.strokeWidth = 4f
+            paint.style = Paint.Style.STROKE
+            canvas.drawRoundRect(size / 2f - 33, size / 2f - 23, size / 2f + 33, size / 2f + 23, 8f, 8f, paint)
+        }
+        else -> {
+            // Colorful teal/turquoise pin for other locations
+            // Shadow
+            paint.color = Color.parseColor("#00695C") // Dark teal shadow
+            paint.style = Paint.Style.FILL
+            val shadowPath = Path()
+            shadowPath.moveTo(size / 2f + 2, size / 2f + 40)
+            shadowPath.lineTo(size / 2f - 28, size / 2f - 13)
+            shadowPath.quadTo(size / 2f - 28, size / 2f - 36, size / 2f + 2, size / 2f - 36)
+            shadowPath.quadTo(size / 2f + 32, size / 2f - 36, size / 2f + 32, size / 2f - 13)
+            shadowPath.close()
+            canvas.drawPath(shadowPath, paint)
             
-            // Border
+            // Main pin - bright teal
+            val pinPath = Path()
+            pinPath.moveTo(size / 2f, size / 2f + 38)
+            pinPath.lineTo(size / 2f - 30, size / 2f - 15)
+            pinPath.quadTo(size / 2f - 30, size / 2f - 38, size / 2f, size / 2f - 38)
+            pinPath.quadTo(size / 2f + 30, size / 2f - 38, size / 2f + 30, size / 2f - 15)
+            pinPath.close()
+            paint.color = Color.parseColor("#00BFA5") // Bright teal
+            canvas.drawPath(pinPath, paint)
+            
+            // Yellow center dot
+            paint.color = Color.parseColor("#FFEB3B") // Bright yellow
+            canvas.drawCircle(size / 2f, size / 2f - 15, 12f, paint)
+            
+            // White outline on center
             paint.color = Color.WHITE
             paint.strokeWidth = 3f
             paint.style = Paint.Style.STROKE
-            canvas.drawRoundRect(size / 2f - 22, size / 2f - 15, size / 2f + 22, size / 2f + 15, 5f, 5f, paint)
-        }
-        else -> {
-            // Gray pin for other/default
-            paint.color = Color.parseColor("#9E9E9E")
-            paint.style = Paint.Style.FILL
-            
-            // Pin shape
-            val pinPath = Path()
-            pinPath.moveTo(size / 2f, size / 2f + 25)
-            pinPath.lineTo(size / 2f - 20, size / 2f - 10)
-            pinPath.quadTo(size / 2f - 20, size / 2f - 25, size / 2f, size / 2f - 25)
-            pinPath.quadTo(size / 2f + 20, size / 2f - 25, size / 2f + 20, size / 2f - 10)
-            pinPath.close()
-            canvas.drawPath(pinPath, paint)
-            
-            paint.color = Color.WHITE
-            canvas.drawCircle(size / 2f, size / 2f - 10, 8f, paint)
+            canvas.drawCircle(size / 2f, size / 2f - 15, 12f, paint)
         }
     }
     
