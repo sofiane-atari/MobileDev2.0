@@ -3,6 +3,11 @@ package com.example.citytripv2.ui.screens
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.location.Location
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -205,12 +210,26 @@ fun MapScreen(
                 update = { mapView ->
                     mapView.overlays.clear()
                     
+                    // Add user location marker if available
+                    if (userLocation != null) {
+                        val userMarker = Marker(mapView).apply {
+                            position = GeoPoint(userLocation!!.latitude, userLocation!!.longitude)
+                            title = "Jouw Locatie"
+                            snippet = "Je bent hier"
+                            icon = createCustomMarker(context, "user")
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        }
+                        mapView.overlays.add(userMarker)
+                    }
+                    
                     // Add markers for filtered locations
                     filteredLocations.forEach { location ->
                         val marker = Marker(mapView).apply {
                             position = GeoPoint(location.latitude, location.longitude)
                             title = location.name
                             snippet = "${location.city} - ${location.category}"
+                            icon = createCustomMarker(context, location.category)
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                             
                             setOnMarkerClickListener { clickedMarker, _ ->
                                 selectedLocation = location
@@ -338,4 +357,141 @@ private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Do
     val c = 2 * atan2(sqrt(a), sqrt(1 - a))
     
     return (earthRadius * c).toFloat()
+}
+
+// Create custom marker based on category
+private fun createCustomMarker(context: Context, category: String): android.graphics.drawable.Drawable {
+    val size = 80
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    
+    // Define colors and shapes for each category
+    when (category.lowercase()) {
+        "user" -> {
+            // Blue circle with dot for user location
+            paint.color = Color.parseColor("#2196F3")
+            paint.style = Paint.Style.FILL
+            canvas.drawCircle(size / 2f, size / 2f, 20f, paint)
+            
+            paint.color = Color.WHITE
+            canvas.drawCircle(size / 2f, size / 2f, 8f, paint)
+            
+            paint.color = Color.parseColor("#2196F3")
+            paint.strokeWidth = 4f
+            paint.style = Paint.Style.STROKE
+            canvas.drawCircle(size / 2f, size / 2f, 28f, paint)
+        }
+        "stad" -> {
+            // Purple star for cities
+            paint.color = Color.parseColor("#9C27B0")
+            paint.style = Paint.Style.FILL
+            drawStar(canvas, paint, size / 2f, size / 2f, 25f, 12f)
+            
+            paint.color = Color.WHITE
+            paint.strokeWidth = 3f
+            paint.style = Paint.Style.STROKE
+            drawStar(canvas, paint, size / 2f, size / 2f, 25f, 12f)
+        }
+        "hotel" -> {
+            // Orange house/building for hotels
+            paint.color = Color.parseColor("#FF9800")
+            paint.style = Paint.Style.FILL
+            canvas.drawRect(size / 2f - 20, size / 2f - 10, size / 2f + 20, size / 2f + 20, paint)
+            
+            // Roof
+            val roofPath = Path()
+            roofPath.moveTo(size / 2f, size / 2f - 25)
+            roofPath.lineTo(size / 2f - 25, size / 2f - 10)
+            roofPath.lineTo(size / 2f + 25, size / 2f - 10)
+            roofPath.close()
+            canvas.drawPath(roofPath, paint)
+            
+            // Border
+            paint.color = Color.WHITE
+            paint.strokeWidth = 3f
+            paint.style = Paint.Style.STROKE
+            canvas.drawRect(size / 2f - 20, size / 2f - 10, size / 2f + 20, size / 2f + 20, paint)
+            canvas.drawPath(roofPath, paint)
+        }
+        "horeca" -> {
+            // Red fork and knife for restaurants
+            paint.color = Color.parseColor("#F44336")
+            paint.style = Paint.Style.FILL
+            canvas.drawCircle(size / 2f, size / 2f, 22f, paint)
+            
+            paint.color = Color.WHITE
+            paint.strokeWidth = 4f
+            paint.style = Paint.Style.STROKE
+            
+            // Fork
+            canvas.drawLine(size / 2f - 8, size / 2f - 10, size / 2f - 8, size / 2f + 10, paint)
+            canvas.drawLine(size / 2f - 12, size / 2f - 10, size / 2f - 12, size / 2f, paint)
+            canvas.drawLine(size / 2f - 4, size / 2f - 10, size / 2f - 4, size / 2f, paint)
+            
+            // Knife
+            canvas.drawLine(size / 2f + 8, size / 2f - 10, size / 2f + 8, size / 2f + 10, paint)
+            canvas.drawCircle(size / 2f + 8, size / 2f - 10, 3f, paint)
+        }
+        "bezienswaardigheid" -> {
+            // Green camera for attractions
+            paint.color = Color.parseColor("#4CAF50")
+            paint.style = Paint.Style.FILL
+            canvas.drawRoundRect(size / 2f - 22, size / 2f - 15, size / 2f + 22, size / 2f + 15, 5f, 5f, paint)
+            
+            // Lens
+            paint.color = Color.parseColor("#81C784")
+            canvas.drawCircle(size / 2f + 5, size / 2f, 10f, paint)
+            
+            // Flash
+            paint.color = Color.WHITE
+            canvas.drawRect(size / 2f - 18, size / 2f - 20, size / 2f - 10, size / 2f - 15, paint)
+            
+            // Border
+            paint.color = Color.WHITE
+            paint.strokeWidth = 3f
+            paint.style = Paint.Style.STROKE
+            canvas.drawRoundRect(size / 2f - 22, size / 2f - 15, size / 2f + 22, size / 2f + 15, 5f, 5f, paint)
+        }
+        else -> {
+            // Gray pin for other/default
+            paint.color = Color.parseColor("#9E9E9E")
+            paint.style = Paint.Style.FILL
+            
+            // Pin shape
+            val pinPath = Path()
+            pinPath.moveTo(size / 2f, size / 2f + 25)
+            pinPath.lineTo(size / 2f - 20, size / 2f - 10)
+            pinPath.quadTo(size / 2f - 20, size / 2f - 25, size / 2f, size / 2f - 25)
+            pinPath.quadTo(size / 2f + 20, size / 2f - 25, size / 2f + 20, size / 2f - 10)
+            pinPath.close()
+            canvas.drawPath(pinPath, paint)
+            
+            paint.color = Color.WHITE
+            canvas.drawCircle(size / 2f, size / 2f - 10, 8f, paint)
+        }
+    }
+    
+    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
+}
+
+// Helper function to draw a star
+private fun drawStar(canvas: Canvas, paint: Paint, cx: Float, cy: Float, outerRadius: Float, innerRadius: Float) {
+    val path = Path()
+    val angle = Math.PI / 5.0
+    
+    for (i in 0..9) {
+        val radius = if (i % 2 == 0) outerRadius else innerRadius
+        val currentAngle = i * angle - Math.PI / 2
+        val x = (cx + radius * cos(currentAngle)).toFloat()
+        val y = (cy + radius * sin(currentAngle)).toFloat()
+        
+        if (i == 0) {
+            path.moveTo(x, y)
+        } else {
+            path.lineTo(x, y)
+        }
+    }
+    path.close()
+    canvas.drawPath(path, paint)
 }
