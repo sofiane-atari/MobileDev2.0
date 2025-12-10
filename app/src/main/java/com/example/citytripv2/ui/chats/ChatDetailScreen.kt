@@ -10,13 +10,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.citytripv2.model.ChatMessage
@@ -30,7 +31,7 @@ import java.util.Locale
 @Composable
 fun ChatDetailScreen(
     chatId: String,
-    otherUserEmail: String, // De naam van degene met wie je praat
+    otherUserEmail: String,
     onNavigateBack: () -> Unit,
     viewModel: ChatViewModel = viewModel()
 ) {
@@ -39,12 +40,18 @@ fun ChatDetailScreen(
     val listState = rememberLazyListState()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
 
-    // Start luisteren naar berichten
+    // Naam mooi maken
+    val displayName = otherUserEmail.split("@")[0].replaceFirstChar { it.uppercase() }
+
+    // Kleuren
+    val headerBlue = Color(0xFF0089D0)
+    val headerGreen = Color(0xFF00A88F)
+    val bgGradient = Brush.horizontalGradient(listOf(headerBlue, headerGreen))
+
     LaunchedEffect(chatId) {
         viewModel.fetchMessages(chatId)
     }
 
-    // Scroll automatisch naar beneden als er een nieuw bericht is
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -56,16 +63,17 @@ fun ChatDetailScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(otherUserEmail.split("@")[0], style = MaterialTheme.typography.titleMedium)
-                        Text("Online", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Text(displayName, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text("Chat", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Terug")
+                        Icon(Icons.Default.ArrowBack, "Terug", tint = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                modifier = Modifier.background(bgGradient)
             )
         }
     ) { padding ->
@@ -75,7 +83,7 @@ fun ChatDetailScreen(
                 .padding(padding)
                 .background(Color(0xFFF5F5F5))
         ) {
-            // Berichtenlijst
+            // Berichten
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
@@ -84,44 +92,51 @@ fun ChatDetailScreen(
             ) {
                 items(messages) { msg ->
                     val isMe = msg.senderId == currentUserId
-                    MessageBubble(message = msg, isMe = isMe)
+                    MessageBubble(message = msg, isMe = isMe, headerBlue = headerBlue)
                 }
             }
 
-            // Input balk
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Input Balk
+            Surface(
+                shadowElevation = 8.dp,
+                color = Color.White
             ) {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    placeholder = { Text("Typ een bericht...") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.LightGray,
-                        focusedBorderColor = Color(0xFF0089D0)
-                    )
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(
-                    onClick = {
-                        if (text.isNotBlank()) {
-                            viewModel.sendMessage(chatId, text)
-                            text = ""
-                        }
-                    },
+                Row(
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(Color(0xFF0089D0), CircleShape)
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.White)
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        placeholder = { Text("Typ een bericht...") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = Color.LightGray,
+                            focusedBorderColor = headerBlue,
+                            focusedContainerColor = Color(0xFFF8F8F8),
+                            unfocusedContainerColor = Color(0xFFF8F8F8)
+                        ),
+                        maxLines = 3
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = {
+                            if (text.isNotBlank()) {
+                                viewModel.sendMessage(chatId, text)
+                                text = ""
+                            }
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(headerBlue, CircleShape)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.White)
+                    }
                 }
             }
         }
@@ -129,7 +144,7 @@ fun ChatDetailScreen(
 }
 
 @Composable
-fun MessageBubble(message: ChatMessage, isMe: Boolean) {
+fun MessageBubble(message: ChatMessage, isMe: Boolean, headerBlue: Color) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
@@ -137,13 +152,14 @@ fun MessageBubble(message: ChatMessage, isMe: Boolean) {
         Card(
             shape = RoundedCornerShape(
                 topStart = 16.dp, topEnd = 16.dp,
-                bottomStart = if (isMe) 16.dp else 0.dp,
-                bottomEnd = if (isMe) 0.dp else 16.dp
+                bottomStart = if (isMe) 16.dp else 4.dp,
+                bottomEnd = if (isMe) 4.dp else 16.dp
             ),
             colors = CardDefaults.cardColors(
-                containerColor = if (isMe) Color(0xFF0089D0) else Color.White
+                containerColor = if (isMe) headerBlue else Color.White
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.widthIn(max = 280.dp) // Max breedte zodat het niet hele scherm vult
         ) {
             Text(
                 text = message.text,

@@ -85,6 +85,8 @@ fun LocationDetailScreen(
             // Is dit MIJN eigen locatie?
             val isMyOwnPost = loc.userId == currentUser?.uid
 
+            val ownerEmail = if (loc.userEmail.isNotBlank()) loc.userEmail else "Eigenaar"
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -127,6 +129,9 @@ fun LocationDetailScreen(
                         Text("Over deze plek:", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(loc.description ?: "Geen beschrijving.", style = MaterialTheme.typography.bodyLarge)
 
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Toegevoegd door: $ownerEmail", style = MaterialTheme.typography.labelSmall, color = headerBlue)
+
                         Divider(modifier = Modifier.padding(vertical = 24.dp))
                     }
                 }
@@ -153,7 +158,6 @@ fun LocationDetailScreen(
                             ReviewSection(
                                 onSubmitReview = { rating, comment ->
                                     viewModel.addReview(loc.id, rating, comment) {
-                                        // Succes actie (optioneel)
                                     }
                                 }
                             )
@@ -170,10 +174,9 @@ fun LocationDetailScreen(
                                 // Start chat met de eigenaar van de locatie
                                 chatViewModel.startChat(
                                     otherUserId = loc.userId,
-                                    otherUserEmail = "Eigenaar" // Eigenlijk zou je hier de email uit loc moeten halen, maar die hebben we niet opgeslagen in Location.
-                                    // Voor nu is 'Eigenaar' prima, of je update je Location model om ook userEmail op te slaan.
+                                    otherUserEmail = ownerEmail
                                 ) { chatId ->
-                                    onNavigateToChat(chatId, "Eigenaar")
+                                    onNavigateToChat(chatId, ownerEmail)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -181,7 +184,7 @@ fun LocationDetailScreen(
                         ) {
                             Icon(Icons.Default.Chat, null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Stuur bericht naar eigenaar")
+                            Text("Stuur bericht naar ${ownerEmail.split("@")[0]}")
                         }
                     }
                 }

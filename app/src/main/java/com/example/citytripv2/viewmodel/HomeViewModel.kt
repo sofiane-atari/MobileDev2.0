@@ -112,6 +112,7 @@ class HomeViewModel : ViewModel() {
             .addOnSuccessListener {
                 // Update ook de rating in het hoofddocument (simpel gemiddelde)
                 // Voor nu overschrijven we hem even om te laten zien dat het werkt
+                // TODO: Gemiddelde berekenen van reviews bij opslatgen en tonen
                 db.collection("locations").document(locationId)
                     .update("rating", rating.toFloat())
                     .addOnSuccessListener { onSuccess() }
@@ -120,6 +121,8 @@ class HomeViewModel : ViewModel() {
 
     fun addLocation(location: CityTripLocation, imageUri: Uri?, context: Context, onSuccess: () -> Unit) {
         val userId = auth.currentUser?.uid ?: return
+        val currentUser = auth.currentUser
+        val userEmail = currentUser?.email ?: "Anoniem"
 
         viewModelScope.launch {
             // 1. Converteer afbeelding naar Base64 String (indien aanwezig)
@@ -132,7 +135,8 @@ class HomeViewModel : ViewModel() {
             // 2. Update het locatie object
             val locationToSave = location.copy(
                 userId = userId,
-                imageUrl = base64Image
+                imageUrl = base64Image,
+                userEmail = userEmail
             )
 
             // 3. Opslaan

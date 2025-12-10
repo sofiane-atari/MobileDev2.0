@@ -11,11 +11,12 @@ data class CityTripLocation(
     val description: String? = null,
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
-    val category: String = "Overige", // "Stad", "Hotel", "Horeca", "Bezienswaardigheid"
+    val category: String = "Overige",
     val imageUrl: String? = null,
     val rating: Float = 0f,
-    val userId: String = ""       // Wie heeft dit aangemaakt?
+    val userId: String = "",       // Wie heeft dit aangemaakt?
+    val userEmail: String = ""
 ) {
-    // Lege constructor is verplicht voor Firebase Firestore om data te kunnen inlezen
-    constructor() : this("", "", "", "", null, 0.0, 0.0, "Overige", null, 0f, "")
+
+    constructor() : this("", "", "", "", null, 0.0, 0.0, "Overige", null, 0f, "","")
 }

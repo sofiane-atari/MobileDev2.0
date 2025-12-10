@@ -310,7 +310,7 @@ fun AddCityScreen(
                 // 5. OPSLAAN
                 Button(
                     onClick = {
-                        if (locationName.isNotBlank() && selectedCityObject != null) {
+                        if (locationName.isNotBlank() && selectedCityObject != null && selectedImageUri != null) {
                             isUploading = true
 
                             val newLocation = CityTripLocation(

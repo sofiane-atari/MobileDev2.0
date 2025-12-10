@@ -87,7 +87,6 @@ fun ProfileScreen(
         }
 
         // --- 2. HET MENU (De witte kaart die overlap heeft) ---
-        // We gebruiken offset om hem omhoog te trekken over de header heen
         Card(
             modifier = Modifier
                 .fillMaxWidth()

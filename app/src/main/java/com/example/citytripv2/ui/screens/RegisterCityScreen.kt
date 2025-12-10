@@ -30,7 +30,6 @@ fun RegisterCityScreen(
     var country by remember { mutableStateOf("") }
     val userId = FirebaseAuth.getInstance().currentUser?.uid
 
-    // FIX 1: Context ophalen (nodig voor de nieuwe addLocation functie)
     val context = LocalContext.current
 
     // Kleuren

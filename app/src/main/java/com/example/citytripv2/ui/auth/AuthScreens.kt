@@ -72,7 +72,7 @@ fun LoginScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp) // Lekker grote header
+                .height(200.dp)
                 .background(bgGradient),
             contentAlignment = Alignment.Center
         ) {
