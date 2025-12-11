@@ -106,16 +106,30 @@ class HomeViewModel : ViewModel() {
             timestamp = System.currentTimeMillis()
         )
 
-        db.collection("locations").document(locationId)
-            .collection("reviews")
-            .add(review)
+        val locationRef = db.collection("locations").document(locationId)
+        val reviewsRef = locationRef.collection("reviews")
+
+        // 1. Voeg de nieuwe review toe
+        reviewsRef.add(review)
             .addOnSuccessListener {
-                // Update ook de rating in het hoofddocument (simpel gemiddelde)
-                // Voor nu overschrijven we hem even om te laten zien dat het werkt
-                // TODO: Gemiddelde berekenen van reviews bij opslatgen en tonen
-                db.collection("locations").document(locationId)
-                    .update("rating", rating.toFloat())
-                    .addOnSuccessListener { onSuccess() }
+                // 2. Haal ALLE reviews op om het gemiddelde te herberekenen
+                reviewsRef.get().addOnSuccessListener { snapshot ->
+                    val allReviews = snapshot.toObjects(Review::class.java)
+
+                    if (allReviews.isNotEmpty()) {
+                        // Bereken het gemiddelde
+                        val averageRating = allReviews.map { it.rating }.average().toFloat()
+
+                        // 3. Update het hoofddocument met het nieuwe gemiddelde
+                        locationRef.update("rating", averageRating)
+                            .addOnSuccessListener { onSuccess() }
+                    } else {
+                        onSuccess()
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("HomeViewModel", "Fout bij toevoegen review", e)
             }
     }
 

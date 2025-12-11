@@ -1,8 +1,11 @@
 package com.example.citytripv2.ui.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.view.MotionEvent
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,10 +33,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.citytripv2.model.CityTripLocation
 import com.example.citytripv2.viewmodel.HomeViewModel
+import com.google.android.gms.location.LocationServices
 import com.google.firebase.auth.FirebaseAuth
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -59,11 +65,9 @@ fun AddCityScreen(
     // --- STATE ---
     var locationName by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-
-    // FOTO STATE
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
-    // De Photo Picker Launcher
+    // Photo Picker
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri -> selectedImageUri = uri }
@@ -76,15 +80,37 @@ fun AddCityScreen(
     var selectedCategory by remember { mutableStateOf(categories[0]) }
     var isCategoryExpanded by remember { mutableStateOf(false) }
 
+    // Locatie
     var selectedLatitude by remember { mutableStateOf(52.3676) }
     var selectedLongitude by remember { mutableStateOf(4.9041) }
 
-    // Is aan het uploaden? (Visuele feedback)
     var isUploading by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
     val headerBlue = Color(0xFF0089D0)
     val headerGreen = Color(0xFF00A88F)
     val bgGradient = Brush.horizontalGradient(listOf(headerBlue, headerGreen))
+
+    // --- NIEUW: Locatie Service Setup ---
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
+            // Als permissie gegeven is, haal locatie op
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    if (location != null) {
+                        selectedLatitude = location.latitude
+                        selectedLongitude = location.longitude
+                        Toast.makeText(context, "Locatie gevonden!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: SecurityException) { e.printStackTrace() }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -143,7 +169,45 @@ fun AddCityScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // --- FOTO KIEZER KNOP ---
+                // Coordinaten Tekst
+                Text(
+                    text = "Coördinaten: ${String.format("%.4f", selectedLatitude)}, ${String.format("%.4f", selectedLongitude)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = headerBlue
+                )
+
+                // --- NIEUW: KNOP "GEBRUIK EIGEN LOCATIE" ---
+                OutlinedButton(
+                    onClick = {
+                        // Check permissies
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                if (location != null) {
+                                    selectedLatitude = location.latitude
+                                    selectedLongitude = location.longitude
+                                } else {
+                                    Toast.makeText(context, "Kan locatie niet bepalen (zet GPS aan)", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            // Vraag permissie
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = headerGreen)
+                ) {
+                    Icon(Icons.Default.MyLocation, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Gebruik mijn huidige locatie")
+                }
+
+                // --- FOTO KIEZER ---
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -184,7 +248,6 @@ fun AddCityScreen(
                         Text("Maak je eerste stad aan")
                     }
                 } else {
-                    // HIER ZAT HET PROBLEEM: We zetten de dropdown en de knop naast elkaar in een Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -192,7 +255,7 @@ fun AddCityScreen(
                         ExposedDropdownMenuBox(
                             expanded = isCityExpanded,
                             onExpandedChange = { isCityExpanded = !isCityExpanded },
-                            modifier = Modifier.weight(1f) // Neemt de meeste ruimte
+                            modifier = Modifier.weight(1f)
                         ) {
                             OutlinedTextField(
                                 value = selectedCityObject?.name ?: "Kies een stad",
@@ -224,10 +287,7 @@ fun AddCityScreen(
                                 }
                             }
                         }
-
                         Spacer(modifier = Modifier.width(8.dp))
-
-                        // Het plus-knopje om alsnog een nieuwe stad aan te maken
                         IconButton(
                             onClick = onNavigateToRegisterCity,
                             colors = IconButtonDefaults.iconButtonColors(
@@ -312,7 +372,6 @@ fun AddCityScreen(
                     onClick = {
                         if (locationName.isNotBlank() && selectedCityObject != null && selectedImageUri != null) {
                             isUploading = true
-
                             val newLocation = CityTripLocation(
                                 id = System.currentTimeMillis().toString(),
                                 name = locationName,
@@ -339,7 +398,6 @@ fun AddCityScreen(
                         Text("Opslaan", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
-
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
@@ -383,6 +441,11 @@ fun MapViewComposable(
         }
     }
 
+    LaunchedEffect(initialLatitude, initialLongitude) {
+        val newPoint = GeoPoint(initialLatitude, initialLongitude)
+        mapView.controller.animateTo(newPoint)
+    }
+
     var marker by remember { mutableStateOf<Marker?>(null) }
 
     DisposableEffect(Unit) {
@@ -392,6 +455,8 @@ fun MapViewComposable(
                     val projection = mapView.projection
                     val geoPoint = projection.fromPixels(e.x.toInt(), e.y.toInt()) as GeoPoint
                     onLocationSelected(geoPoint.latitude, geoPoint.longitude)
+
+                    // Marker logic
                     marker?.let { mapView.overlays.remove(it) }
                     val newMarker = Marker(mapView).apply {
                         position = geoPoint
@@ -407,6 +472,7 @@ fun MapViewComposable(
             }
         }
         mapView.overlays.add(tapOverlay)
+
         val startMarker = Marker(mapView).apply {
             position = GeoPoint(initialLatitude, initialLongitude)
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
@@ -414,7 +480,15 @@ fun MapViewComposable(
         }
         mapView.overlays.add(startMarker)
         marker = startMarker
+
         onDispose { mapView.onDetach() }
+    }
+
+    LaunchedEffect(initialLatitude, initialLongitude) {
+        if (marker != null) {
+            marker!!.position = GeoPoint(initialLatitude, initialLongitude)
+            mapView.invalidate()
+        }
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)

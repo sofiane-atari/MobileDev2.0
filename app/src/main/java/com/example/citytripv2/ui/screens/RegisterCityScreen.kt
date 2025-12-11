@@ -1,5 +1,6 @@
 package com.example.citytripv2.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,10 +30,12 @@ fun RegisterCityScreen(
     var cityName by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("") }
     val userId = FirebaseAuth.getInstance().currentUser?.uid
-
     val context = LocalContext.current
 
-    // Kleuren
+    // NIEUW: Haal de bestaande locaties op om te checken op dubbels
+    val allLocations by viewModel.locations.collectAsState()
+
+    // Kleuren (Consistent met HomeScreen)
     val headerBlue = Color(0xFF0089D0)
     val headerGreen = Color(0xFF00A88F)
     val bgGradient = Brush.horizontalGradient(listOf(headerBlue, headerGreen))
@@ -133,20 +136,34 @@ fun RegisterCityScreen(
             Button(
                 onClick = {
                     if (cityName.isNotBlank() && country.isNotBlank() && userId != null) {
-                        val newCity = CityTripLocation(
-                            id = System.currentTimeMillis().toString(),
-                            name = cityName,
-                            city = cityName,
-                            country = country,
-                            description = "Hoofdstad/Regio",
-                            category = "Stad",
-                            latitude = 0.0,
-                            longitude = 0.0,
-                            userId = userId
-                        )
 
-                        viewModel.addLocation(newCity, null, context) {
-                            onNavigateBack()
+                        // --- NIEUW: VALIDATIE CHECK ---
+                        val cleanName = cityName.trim()
+                        val cityExists = allLocations.any { existingLocation ->
+                            existingLocation.category == "Stad" &&
+                                    existingLocation.userId == userId &&
+                                    existingLocation.name.equals(cleanName, ignoreCase = true)
+                        }
+
+                        if (cityExists) {
+                            Toast.makeText(context, "De stad '$cleanName' bestaat al in jouw lijst!", Toast.LENGTH_LONG).show()
+                        } else {
+                            // Stad bestaat nog niet -> Opslaan
+                            val newCity = CityTripLocation(
+                                id = System.currentTimeMillis().toString(),
+                                name = cleanName,
+                                city = cleanName,
+                                country = country.trim(),
+                                description = "Hoofdstad/Regio",
+                                category = "Stad",
+                                latitude = 0.0,
+                                longitude = 0.0,
+                                userId = userId
+                            )
+
+                            viewModel.addLocation(newCity, null, context) {
+                                onNavigateBack()
+                            }
                         }
                     }
                 },
